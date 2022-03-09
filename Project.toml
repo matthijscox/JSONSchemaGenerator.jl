@@ -1,0 +1,13 @@
+name = "JSONSchemaGenerator"
+uuid = "b10a6b5e-eaef-4b72-b159-8e5005e98e8e"
+authors = ["matcox <matthijs.cox@asml.com> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
