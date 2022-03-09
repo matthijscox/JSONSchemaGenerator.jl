@@ -47,6 +47,14 @@ end
 
 @testset "Basic Types" begin
     json_schema = JSONSchemaGenerator.generate(TestTypes.BasicSchema)
+    @test json_schema["type"] == "object"
+    object_properties = ["int", "float", "string"]
+    @test all(x in object_properties for x in json_schema["required"])
+    @test all(x in object_properties for x in keys(json_schema["properties"]))
+
+    @test json_schema["properties"]["int"]["type"] == "integer"
+    @test json_schema["properties"]["float"]["type"] == "number"
+    @test json_schema["properties"]["string"]["type"] == "string"
     # is a dictionary that can be passed into JSONSchema.Schema()
     # and can be written to a JSON file
 end
