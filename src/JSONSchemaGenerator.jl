@@ -66,12 +66,14 @@ function _generate_json_type_def(julia_type::Type)
 end
 
 function _generate_json_type_def(julia_type::Type, ::Val{:object})
-    # if !nested && applicable(StructTypes.StructType, julia_type)
-    # d = OrderedDict{String, Any}(
-    #     "\$ref" => _json_reference(julia_type)
-    # )
-    # else
     return _generate_json_object(julia_type)
+end
+
+function _generate_json_type_def(julia_type::Type{<:AbstractArray{T}}, ::Val{:array}) where T
+    return OrderedDict{String, Any}(
+        "type" => "array",
+        "items" => _generate_json_type_def(T)
+    )
 end
 
 function _generate_json_type_def(julia_type::Type, ::Val{:enum})

@@ -159,16 +159,14 @@ end
         {
     "type": "array",
     "items": {
-        "type": "integer"
-    }
-    }=#
-    #=
-        {
-    "type": "array",
-    "items": {
         "type": "object" # or "type": { "\$ref": "#/OptionalFieldSchema" }
     }
     }=#
     json_schema = JSONSchemaGenerator.generate(TestTypes.ArraySchema)
     # so behavior depends on the eltype of the array
+    @test json_schema["properties"]["integers"]["type"] == "array"
+    @test json_schema["properties"]["integers"]["items"]["type"] == "integer"
+
+    enum_schema = JSONSchemaGenerator.generate(TestTypes.EnumeratedSchema)
+    @test json_schema["properties"]["types"]["items"] == enum_schema
 end
