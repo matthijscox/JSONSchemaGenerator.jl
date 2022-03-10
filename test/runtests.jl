@@ -156,7 +156,39 @@ end
     @test double_nested_schema["properties"]["nested"] == nested_schema
 
     test_json_schema_validation(TestTypes.DoubleNestedSchema())
+end
 
+@testset "StructTypes.DataType gathering" begin
+    types = JSONSchemaGenerator._gather_data_types(TestTypes.NestedSchema)
+    expected_types = [
+        TestTypes.NestedSchema
+        TestTypes.OptionalFieldSchema
+        TestTypes.EnumeratedSchema
+    ]
+    @test length(types) == length(expected_types)
+    @test all(x in types for x in expected_types)
+
+    types = JSONSchemaGenerator._gather_data_types(TestTypes.ArraySchema)
+    expected_types = [
+        TestTypes.ArraySchema
+        TestTypes.OptionalFieldSchema
+    ]
+    @test length(types) == length(expected_types)
+    @test all(x in types for x in expected_types)
+
+    types = JSONSchemaGenerator._gather_data_types(TestTypes.DoubleNestedSchema)
+    expected_types = [
+        TestTypes.NestedSchema
+        TestTypes.DoubleNestedSchema
+        TestTypes.EnumeratedSchema
+        TestTypes.OptionalFieldSchema
+        TestTypes.ArraySchema
+    ]
+    @test length(types) == length(expected_types)
+    @test all(x in types for x in expected_types)
+end
+
+@testset "Nested Structs using schema references" begin
     # now, for readability we want to make use of JSON schema references
     # it should resolve to something like this:
     """
@@ -198,4 +230,3 @@ end
     }
     """
 end
-

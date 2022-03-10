@@ -27,13 +27,13 @@ _get_optional_type(::Type{Union{Nothing, T}}) where T = T
 
 Generate a JSONSchema in the form of a dictionary
 """
-function generate(schema_type::Type; nested::Bool=true)
-    d = _generate_json_object(schema_type, nested)
+function generate(schema_type::Type; references::Bool=false)
+    d = _generate_json_object(schema_type)
     return d
 end
 
 # by default we do not resolve nested objects into reference definitions
-function _generate_json_object(julia_type::Type, nested::Bool=true)
+function _generate_json_object(julia_type::Type)
     names = fieldnames(julia_type)
     types = fieldtypes(julia_type)
     json_property_names = String[]
@@ -42,7 +42,6 @@ function _generate_json_object(julia_type::Type, nested::Bool=true)
     for (name, type) in zip(names, types)
         name_string = string(name)
         if _is_nothing_union(type) # we assume it's an optional field type
-            @assert applicable(StructTypes.omitempties, julia_type) "we expect StructTypes.omitempties for Union{Nothing, T} fields"
             @assert name in StructTypes.omitempties(julia_type) "we miss $name in $(StructTypes.omitempties(julia_type))"
             type = _get_optional_type(type)
         else
@@ -91,6 +90,29 @@ end
 # used in things like { "\$ref": "#/MyObject" }
 function _json_reference(julia_type::Type)
     return "#/" * string(julia_type)
+end
+
+function _gather_data_types(julia_type::Type)::Set{DataType}
+    data_types = Set{DataType}()
+    _gather_data_types!(data_types, julia_type)
+    return data_types
+end
+
+function _gather_data_types!(data_types::Set{DataType}, julia_type::Type)::Nothing
+    if StructTypes.StructType(julia_type) isa StructTypes.DataType
+        push!(data_types, julia_type)
+        for field_type in fieldtypes(julia_type)
+            if _is_nothing_union(field_type)
+                type_to_gather = _get_optional_type(field_type)
+            elseif field_type <: AbstractArray
+                type_to_gather = eltype(field_type)
+            else
+                type_to_gather = field_type
+            end
+            _gather_data_types!(data_types, type_to_gather)
+        end
+    end
+    return nothing
 end
 
 end
