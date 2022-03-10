@@ -2,4 +2,7 @@
 
 Create minimal JSON schemas from custom Julia types.
 
-I advise to use StructTypes.jl for JSON schema generation together with JSON3 for JSON generation.
+Current restrictions:
+* no parametric types
+* no Union types, except `Union{Nothing, T}` for optional fields
+* must use `StructTypes.StructType` definition for your custom types
