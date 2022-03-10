@@ -31,6 +31,20 @@ module TestTypes
     StructTypes.StructType(::Type{OptionalFieldSchema}) = StructTypes.Struct()
     StructTypes.omitempties(::Type{OptionalFieldSchema}) = (:optional,)
 
+    struct ArraySchema
+        integers::Vector{Int64}
+        types::Vector{OptionalFieldSchema}
+    end
+    StructTypes.StructType(::Type{ArraySchema}) = StructTypes.Struct()
+
+    function ArraySchema()
+        optional_array = [
+            TestTypes.OptionalFieldSchema(1, "foo"),
+            TestTypes.OptionalFieldSchema(1, nothing)
+        ]
+        return ArraySchema([1,2], optional_array)
+    end
+
     struct NestedSchema
         int::Int
         optional::OptionalFieldSchema
@@ -38,20 +52,37 @@ module TestTypes
     end
     StructTypes.StructType(::Type{NestedSchema}) = StructTypes.Struct()
 
+    function NestedSchema()
+        return NestedSchema(
+            1,
+            OptionalFieldSchema(1, nothing),
+            EnumeratedSchema(apple)
+        )
+    end
+
     struct DoubleNestedSchema
         int::Int
-        optional::OptionalFieldSchema
+        arrays::ArraySchema
         enum::EnumeratedSchema
         nested::NestedSchema
     end
     StructTypes.StructType(::Type{DoubleNestedSchema}) = StructTypes.Struct()
 
-    struct ArraySchema
-        integers::Vector{Int64}
-        types::Vector{EnumeratedSchema}
+    function DoubleNestedSchema()
+        return DoubleNestedSchema(
+            1,
+            ArraySchema(),
+            EnumeratedSchema(apple),
+            NestedSchema(),
+        )
     end
-    StructTypes.StructType(::Type{ArraySchema}) = StructTypes.Struct()
+end
 
+function test_json_schema_validation(obj::T) where T
+    json_schema = JSONSchemaGenerator.generate(T)
+    json_string = JSON3.write(obj) # we can write the schema to a JSON string
+    my_schema = JSONSchema.Schema(json_schema) # make a schema
+    @test JSONSchema.validate(my_schema, JSON.parse(json_string)) === nothing # validation is OK
 end
 
 @testset "Basic Types" begin
@@ -64,11 +95,8 @@ end
     @test json_schema["properties"]["int"]["type"] == "integer"
     @test json_schema["properties"]["float"]["type"] == "number"
     @test json_schema["properties"]["string"]["type"] == "string"
-    # can be written to a JSON file
-    json_string = JSON3.write(TestTypes.BasicSchema(1, 1.0, "a"))
-    # and the JSONSchema validation works fine
-    my_schema = Schema(json_schema)
-    @test validate(my_schema, JSON.parse(json_string)) === nothing
+
+    test_json_schema_validation(TestTypes.BasicSchema(1, 1.0, "a"))
 end
 
 @testset "Enumerators" begin
@@ -76,6 +104,8 @@ end
     enum_instances = ["apple", "orange"]
     fruit_json_enum = json_schema["properties"]["fruit"]["enum"]
     @test all(x in fruit_json_enum for x in enum_instances)
+
+    test_json_schema_validation(TestTypes.EnumeratedSchema(TestTypes.apple))
 end
 
 @testset "Optional Fields" begin
@@ -85,16 +115,8 @@ end
     @test json_schema["properties"]["optional"]["type"] == "string"
 
     # and the JSONSchema validation works fine
-    obj = TestTypes.OptionalFieldSchema(1, nothing)
-    json_string = JSON3.write(obj)
-    my_schema = Schema(json_schema)
-    @test validate(my_schema, JSON.parse(json_string)) === nothing
-
-    # and the JSONSchema validation works fine
-    obj = TestTypes.OptionalFieldSchema(1, "foo")
-    json_string = JSON3.write(obj)
-    my_schema = Schema(json_schema)
-    @test validate(my_schema, JSON.parse(json_string)) === nothing
+    test_json_schema_validation(TestTypes.OptionalFieldSchema(1, nothing))
+    test_json_schema_validation(TestTypes.OptionalFieldSchema(1, "foo"))
 
     #StructTypes.StructType(::Type{TestTypes.OptionalFieldSchema}) = StructTypes.Struct()
     # if StructType is defined, but omitempties is not defined for the optional field, then we should throw an error
@@ -103,14 +125,37 @@ end
     #json_schema = JSONSchemaGenerator.generate(TestTypes.OptionalFieldSchema)
 end
 
+@testset "Arrays" begin
+    #=
+        {
+    "type": "array",
+    "items": {
+        "type": "object" # or "type": { "\$ref": "#/OptionalFieldSchema" }
+    }
+    }=#
+    json_schema = JSONSchemaGenerator.generate(TestTypes.ArraySchema)
+    # so behavior depends on the eltype of the array
+    @test json_schema["properties"]["integers"]["type"] == "array"
+    @test json_schema["properties"]["integers"]["items"]["type"] == "integer"
+
+    opt_schema = JSONSchemaGenerator.generate(TestTypes.OptionalFieldSchema)
+    @test json_schema["properties"]["types"]["items"] == opt_schema
+
+    test_json_schema_validation(TestTypes.ArraySchema())
+end
+
 @testset "Nested Structs" begin
     nested_schema = JSONSchemaGenerator.generate(TestTypes.NestedSchema)
     optional_field_schema = JSONSchemaGenerator.generate(TestTypes.OptionalFieldSchema)
     # by default it's a nested JSON schema
     @test nested_schema["properties"]["optional"] == optional_field_schema
 
+    test_json_schema_validation(TestTypes.NestedSchema())
+
     double_nested_schema = JSONSchemaGenerator.generate(TestTypes.DoubleNestedSchema)
     @test double_nested_schema["properties"]["nested"] == nested_schema
+
+    test_json_schema_validation(TestTypes.DoubleNestedSchema())
 
     # now, for readability we want to make use of JSON schema references
     # it should resolve to something like this:
@@ -154,19 +199,3 @@ end
     """
 end
 
-@testset "Arrays" begin
-    #=
-        {
-    "type": "array",
-    "items": {
-        "type": "object" # or "type": { "\$ref": "#/OptionalFieldSchema" }
-    }
-    }=#
-    json_schema = JSONSchemaGenerator.generate(TestTypes.ArraySchema)
-    # so behavior depends on the eltype of the array
-    @test json_schema["properties"]["integers"]["type"] == "array"
-    @test json_schema["properties"]["integers"]["items"]["type"] == "integer"
-
-    enum_schema = JSONSchemaGenerator.generate(TestTypes.EnumeratedSchema)
-    @test json_schema["properties"]["types"]["items"] == enum_schema
-end
