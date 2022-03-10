@@ -61,12 +61,14 @@ function _generate_json_object(julia_type::Type, settings::SchemaSettings)
     json_property_names = String[]
     required_json_property_names = String[]
     json_properties = []
+    optional_fields = StructTypes.omitempties(julia_type)
+    # TODO: use StructTypes.names instead of fieldnames
     for (name, type) in zip(names, types)
         name_string = string(name)
         if _is_nothing_union(type) # we assume it's an optional field type
-            @assert name in StructTypes.omitempties(julia_type) "we miss $name in $(StructTypes.omitempties(julia_type))"
+            @assert name in optional_fields "we miss $name in $(StructTypes.omitempties(julia_type))"
             type = _get_optional_type(type)
-        else
+        elseif !(name in optional_fields)
             push!(required_json_property_names, name_string)
         end
         if settings.use_references && type in settings.reference_types
