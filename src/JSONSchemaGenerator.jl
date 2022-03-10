@@ -27,14 +27,15 @@ Base.@kwdef mutable struct SchemaSettings
     use_references::Bool = false # create schema references instead of nesting types
     reference_types::Set{DataType}
     reference_path = "#/\$defs/"
+    dict_type::Type{<:AbstractDict} = OrderedDict
 end
 
 """
-    schema(::Type)::OrderedDict{String, Any}
+    schema(::Type)::AbstractDict{String, Any}
 
 Generate a JSONSchema in the form of a dictionary
 """
-function schema(schema_type::Type; use_references::Bool=false)
+function schema(schema_type::Type; use_references::Bool=false, dict_type::Type{<:AbstractDict} = OrderedDict)
     if use_references
         reference_types = _gather_data_types(schema_type)
     else
@@ -43,6 +44,7 @@ function schema(schema_type::Type; use_references::Bool=false)
     settings = SchemaSettings(
         use_references = use_references,
         reference_types = reference_types,
+        dict_type = dict_type,
     )
     d = _generate_json_object(schema_type, settings)
     return d
@@ -74,9 +76,9 @@ function _generate_json_object(julia_type::Type, settings::SchemaSettings)
         end
         push!(json_property_names, name_string)
     end
-    d = OrderedDict{String, Any}(
+    d = settings.dict_type{String, Any}(
         "type" => "object",
-        "properties" => OrderedDict{String, Any}(
+        "properties" => settings.dict_type{String, Any}(
             json_property_names .=> json_properties
         ),
         "required" => required_json_property_names,
@@ -96,33 +98,33 @@ function _generate_json_type_def(::Val{:object}, julia_type::Type, settings::Sch
 end
 
 function _generate_json_type_def(::Val{:array}, julia_type::Type{<:AbstractArray{T}}, settings::SchemaSettings) where T
-    return OrderedDict{String, Any}(
+    return settings.dict_type{String, Any}(
         "type" => "array",
         "items" => _generate_json_type_def(T, settings)
     )
 end
 
 function _generate_json_type_def(::Val{:enum}, julia_type::Type, settings::SchemaSettings)
-    return OrderedDict{String, Tuple{Vararg{String}}}(
+    return settings.dict_type{String, Tuple{Vararg{String}}}(
         "enum" => string.(instances(julia_type))
     )
 end
 
 function _generate_json_type_def(::Val, julia_type::Type, settings::SchemaSettings)
-    return OrderedDict{String, String}(
+    return settings.dict_type{String, String}(
         "type" => string(_json_type(julia_type))
     )
 end
 
 # used in things like { "\$ref": "#/MyObject" }
 function _json_reference(julia_type::Type, settings::SchemaSettings)
-    return OrderedDict{String, String}(
+    return settings.dict_type{String, String}(
          "\$ref" => settings.reference_path * string(julia_type)
     )
 end
 
 function _generate_json_reference_types(settings::SchemaSettings)
-    d = OrderedDict{String, Any}()
+    d = settings.dict_type{String, Any}()
     for ref_type in settings.reference_types
         d[string(ref_type)] = _generate_json_type_def(ref_type, settings)
     end
