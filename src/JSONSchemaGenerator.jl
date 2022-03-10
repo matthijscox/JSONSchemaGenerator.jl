@@ -22,18 +22,38 @@ _is_nothing_union(::Type{Union{Nothing, T}}) where T = true
 
 _get_optional_type(::Type{Union{Nothing, T}}) where T = T
 
+Base.@kwdef mutable struct SchemaSettings
+    toplevel::Bool = true # will be set to false by top level schema object
+    use_references::Bool = false # create schema references instead of nesting types
+    reference_types::Set{DataType}
+    reference_path = "#/\$defs/"
+end
+
 """
-    generate(::Type)::OrderedDict{String, Any}
+    schema(::Type)::OrderedDict{String, Any}
 
 Generate a JSONSchema in the form of a dictionary
 """
-function generate(schema_type::Type; references::Bool=false)
-    d = _generate_json_object(schema_type)
+function schema(schema_type::Type; use_references::Bool=false)
+    if use_references
+        reference_types = _gather_data_types(schema_type)
+    else
+        reference_types = Set{DataType}()
+    end
+    settings = SchemaSettings(
+        use_references = use_references,
+        reference_types = reference_types,
+    )
+    d = _generate_json_object(schema_type, settings)
     return d
 end
 
 # by default we do not resolve nested objects into reference definitions
-function _generate_json_object(julia_type::Type)
+function _generate_json_object(julia_type::Type, settings::SchemaSettings)
+    is_top_level = settings.toplevel
+    if is_top_level
+        settings.toplevel = false # downstream types are not toplevel
+    end
     names = fieldnames(julia_type)
     types = fieldtypes(julia_type)
     json_property_names = String[]
@@ -47,49 +67,66 @@ function _generate_json_object(julia_type::Type)
         else
             push!(required_json_property_names, name_string)
         end
-        # TODO: handling referencing to objects
-        push!(json_properties, _generate_json_type_def(type))
+        if settings.use_references && type in settings.reference_types
+            push!(json_properties, _json_reference(type, settings))
+        else
+            push!(json_properties, _generate_json_type_def(type, settings))
+        end
         push!(json_property_names, name_string)
     end
-    return OrderedDict{String, Any}(
+    d = OrderedDict{String, Any}(
         "type" => "object",
         "properties" => OrderedDict{String, Any}(
             json_property_names .=> json_properties
         ),
         "required" => required_json_property_names,
     )
+    if is_top_level && settings.use_references
+        d["\$defs"] = _generate_json_reference_types(settings)
+    end
+    return d
 end
 
-function _generate_json_type_def(julia_type::Type)
-    return _generate_json_type_def(julia_type::Type, Val(_json_type(julia_type)))
+function _generate_json_type_def(julia_type::Type, settings::SchemaSettings)
+    return _generate_json_type_def(Val(_json_type(julia_type)), julia_type, settings)
 end
 
-function _generate_json_type_def(julia_type::Type, ::Val{:object})
-    return _generate_json_object(julia_type)
+function _generate_json_type_def(::Val{:object}, julia_type::Type, settings::SchemaSettings)
+    return _generate_json_object(julia_type, settings)
 end
 
-function _generate_json_type_def(julia_type::Type{<:AbstractArray{T}}, ::Val{:array}) where T
+function _generate_json_type_def(::Val{:array}, julia_type::Type{<:AbstractArray{T}}, settings::SchemaSettings) where T
     return OrderedDict{String, Any}(
         "type" => "array",
-        "items" => _generate_json_type_def(T)
+        "items" => _generate_json_type_def(T, settings)
     )
 end
 
-function _generate_json_type_def(julia_type::Type, ::Val{:enum})
+function _generate_json_type_def(::Val{:enum}, julia_type::Type, settings::SchemaSettings)
     return OrderedDict{String, Tuple{Vararg{String}}}(
         "enum" => string.(instances(julia_type))
     )
 end
 
-function _generate_json_type_def(julia_type::Type, ::Val)
+function _generate_json_type_def(::Val, julia_type::Type, settings::SchemaSettings)
     return OrderedDict{String, String}(
         "type" => string(_json_type(julia_type))
     )
 end
 
 # used in things like { "\$ref": "#/MyObject" }
-function _json_reference(julia_type::Type)
-    return "#/" * string(julia_type)
+function _json_reference(julia_type::Type, settings::SchemaSettings)
+    return OrderedDict{String, String}(
+         "\$ref" => settings.reference_path * string(julia_type)
+    )
+end
+
+function _generate_json_reference_types(settings::SchemaSettings)
+    d = OrderedDict{String, Any}()
+    for ref_type in settings.reference_types
+        d[string(ref_type)] = _generate_json_type_def(ref_type, settings)
+    end
+    return d
 end
 
 function _gather_data_types(julia_type::Type)::Set{DataType}
