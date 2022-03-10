@@ -94,7 +94,9 @@ end
 
 function _gather_data_types(julia_type::Type)::Set{DataType}
     data_types = Set{DataType}()
-    _gather_data_types!(data_types, julia_type)
+    for field_type in fieldtypes(julia_type)
+        _gather_data_types!(data_types, _get_type_to_gather(field_type))
+    end
     return data_types
 end
 
@@ -102,17 +104,21 @@ function _gather_data_types!(data_types::Set{DataType}, julia_type::Type)::Nothi
     if StructTypes.StructType(julia_type) isa StructTypes.DataType
         push!(data_types, julia_type)
         for field_type in fieldtypes(julia_type)
-            if _is_nothing_union(field_type)
-                type_to_gather = _get_optional_type(field_type)
-            elseif field_type <: AbstractArray
-                type_to_gather = eltype(field_type)
-            else
-                type_to_gather = field_type
-            end
-            _gather_data_types!(data_types, type_to_gather)
+            _gather_data_types!(data_types, _get_type_to_gather(field_type))
         end
     end
     return nothing
+end
+
+function _get_type_to_gather(input_type::Type)
+    if _is_nothing_union(input_type)
+        type_to_gather = _get_optional_type(input_type)
+    elseif input_type <: AbstractArray
+        type_to_gather = eltype(input_type)
+    else
+        type_to_gather = input_type
+    end
+    return type_to_gather
 end
 
 end

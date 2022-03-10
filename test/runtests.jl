@@ -161,7 +161,6 @@ end
 @testset "StructTypes.DataType gathering" begin
     types = JSONSchemaGenerator._gather_data_types(TestTypes.NestedSchema)
     expected_types = [
-        TestTypes.NestedSchema
         TestTypes.OptionalFieldSchema
         TestTypes.EnumeratedSchema
     ]
@@ -170,7 +169,6 @@ end
 
     types = JSONSchemaGenerator._gather_data_types(TestTypes.ArraySchema)
     expected_types = [
-        TestTypes.ArraySchema
         TestTypes.OptionalFieldSchema
     ]
     @test length(types) == length(expected_types)
@@ -179,7 +177,6 @@ end
     types = JSONSchemaGenerator._gather_data_types(TestTypes.DoubleNestedSchema)
     expected_types = [
         TestTypes.NestedSchema
-        TestTypes.DoubleNestedSchema
         TestTypes.EnumeratedSchema
         TestTypes.OptionalFieldSchema
         TestTypes.ArraySchema
