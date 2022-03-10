@@ -13,6 +13,7 @@ _json_type(::Type{<:Integer}) = :integer
 _json_type(::Type{<:Real}) = :number
 _json_type(::Type{Nothing}) = :null
 _json_type(::Type{Missing}) = :null
+_json_type(::Type{<:Enum}) = :enum
 _json_type(::Type{<:AbstractString}) = :string
 
 _is_nothing_union(x::Type) = false
@@ -29,30 +30,24 @@ function generate(schema_type::Type)
     return d
 end
 
-#=
-For example:
-{
-"type": "object",
-"properties": {
-  "first_name": { "type": "string" },
-  "last_name": { "type": "string" },
-  "shipping_address": { "$ref": "/schemas/address" },
-  "billing_address": { "$ref": "/schemas/address" }
-},
-"required": ["first_name", "last_name", "shipping_address", "billing_address"]
-}
-=#
 function _generate_json_object(julia_type::Type)
     names = string.(fieldnames(julia_type))
     types = fieldtypes(julia_type)
-    d = OrderedDict{String, Any}(
+    required_json_property_names = String[]
+    json_properties = []
+    for (name, type) in zip(names, types)
+        # TODO: remove optional fields of Union{Nothing, T}
+        push!(required_json_property_names, name)
+        # TODO: handling referencing to objects
+        push!(json_properties, _generate_json_type_def(type))
+    end
+    return OrderedDict{String, Any}(
         "type" => "object",
         "properties" => OrderedDict{String, Any}(
-            names .=> _generate_json_type_def.(types) # TODO: handling referencing to objects
+            names .=> json_properties
         ),
-        "required" => names, # TODO: remove optional fields of Union{Nothing, T}
+        "required" => required_json_property_names,
     )
-    return d
 end
 
 function _generate_json_type_def(julia_type::Type)
@@ -60,14 +55,16 @@ function _generate_json_type_def(julia_type::Type)
 end
 
 function _generate_json_type_def(julia_type::Type, ::Val{:object})
-    return OrderedDict{String, String}(
-        "\$ref" => _json_reference(julia_type)
-    )
+    #if applicable(StructTypes.StructType, julia_type)
+    # d = OrderedDict{String, Any}(
+    #     "\$ref" => _json_reference(julia_type)
+    # )
+    return _generate_json_object(julia_type)
 end
 
 function _generate_json_type_def(julia_type::Type, ::Val{:enum})
-    return OrderedDict{String, String}(
-        "enum" => string(_json_type(julia_type))
+    return OrderedDict{String, Tuple{Vararg{String}}}(
+        "enum" => string.(instances(julia_type))
     )
 end
 

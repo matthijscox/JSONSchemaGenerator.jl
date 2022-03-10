@@ -1,5 +1,6 @@
 using JSONSchemaGenerator
 using Test
+using JSON
 using JSON3
 using JSONSchema
 using StructTypes
@@ -55,12 +56,18 @@ end
     @test json_schema["properties"]["int"]["type"] == "integer"
     @test json_schema["properties"]["float"]["type"] == "number"
     @test json_schema["properties"]["string"]["type"] == "string"
-    # is a dictionary that can be passed into JSONSchema.Schema()
-    # and can be written to a JSON file
+    # can be written to a JSON file
+    json_string = JSON.json(TestTypes.BasicSchema(1, 1.0, "a"))
+    # and the JSONSchema validation works fine
+    my_schema = Schema(json_schema)
+    @test validate(my_schema, JSON.parse(json_string)) === nothing
 end
 
 @testset "Enumerators" begin
     json_schema = JSONSchemaGenerator.generate(TestTypes.EnumeratedSchema)
+    enum_instances = ["apple", "orange"]
+    fruit_json_enum = json_schema["properties"]["fruit"]["enum"]
+    @test all(x in fruit_json_enum for x in enum_instances)
 end
 
 @testset "Optional Fields" begin
