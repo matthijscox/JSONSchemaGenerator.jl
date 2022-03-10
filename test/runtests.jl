@@ -247,11 +247,9 @@ end
     @test nested_def["properties"]["optional"]["\$ref"] == "#/\$defs/" * string(TestTypes.OptionalFieldSchema)
 
     # https://www.jsonschemavalidator.net/ succeeds, but JSONSchema fails to resolve references
-    json_schema_parsed = json_schema |> JSON.json |> JSON.parse
-    test_json_schema_validation(json_schema_parsed, TestTypes.DoubleNestedSchema())
+    test_json_schema_validation(json_schema, TestTypes.DoubleNestedSchema())
 
     # also for single nesting
     json_schema = JSONSchemaGenerator.schema(TestTypes.NestedSchema, use_references=true, dict_type=Dict)
-    json_schema_parsed = json_schema |> JSON.json |> JSON.parse
-    test_json_schema_validation(json_schema_parsed, TestTypes.NestedSchema())
+    test_json_schema_validation(json_schema, TestTypes.NestedSchema())
 end

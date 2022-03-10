@@ -105,20 +105,20 @@ function _generate_json_type_def(::Val{:array}, julia_type::Type{<:AbstractArray
 end
 
 function _generate_json_type_def(::Val{:enum}, julia_type::Type, settings::SchemaSettings)
-    return settings.dict_type{String, Tuple{Vararg{String}}}(
+    return settings.dict_type{String, Any}(
         "enum" => string.(instances(julia_type))
     )
 end
 
 function _generate_json_type_def(::Val, julia_type::Type, settings::SchemaSettings)
-    return settings.dict_type{String, String}(
+    return settings.dict_type{String, Any}(
         "type" => string(_json_type(julia_type))
     )
 end
 
 # used in things like { "\$ref": "#/MyObject" }
 function _json_reference(julia_type::Type, settings::SchemaSettings)
-    return settings.dict_type{String, String}(
+    return settings.dict_type{String, Any}(
          "\$ref" => settings.reference_path * string(julia_type)
     )
 end
