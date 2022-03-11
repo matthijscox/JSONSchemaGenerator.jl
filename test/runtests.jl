@@ -242,6 +242,8 @@ end
     @test length(json_schema["\$defs"]) == length(JSONSchemaGenerator._gather_data_types(TestTypes.DoubleNestedSchema))
     array_type_def = json_schema["\$defs"][string(TestTypes.ArraySchema)]
     array_optional_eltype = array_type_def["properties"]["types"]["items"]
+    # this must also be a reference
+    @test array_optional_eltype["\$ref"] == "#/\$defs/$(string(TestTypes.OptionalFieldSchema))"
 
     nested_def = json_schema["\$defs"][string(TestTypes.NestedSchema)]
     @test nested_def["properties"]["optional"]["\$ref"] == "#/\$defs/" * string(TestTypes.OptionalFieldSchema)

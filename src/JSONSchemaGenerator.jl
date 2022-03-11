@@ -31,11 +31,42 @@ Base.@kwdef mutable struct SchemaSettings
 end
 
 """
-    schema(::Type)::AbstractDict{String, Any}
+```julia
+schema(
+    schema_type::Type;
+    use_references::Bool = false,
+    dict_type::Type{<:AbstractDict} = OrderedCollections.OrderedDict
+)::AbstractDict{String, Any}
+```
 
-Generate a JSONSchema in the form of a dictionary
+Generate a JSONSchema in the form of a dictionary.
+
+# Example
+```julia
+using JSONSchemaGenerator, StructTypes
+
+struct OptionalFieldSchema
+    int::Int
+    optional::Union{Nothing, String}
+end
+StructTypes.StructType(::Type{OptionalFieldSchema}) = StructTypes.Struct()
+StructTypes.omitempties(::Type{OptionalFieldSchema}) = (:optional,)
+
+struct NestedFieldSchema
+    int::Int
+    field::OptionalFieldSchema
+    vector::Vector{OptionalFieldSchema}
+end
+StructTypes.StructType(::Type{NestedFieldSchema}) = StructTypes.Struct()
+
+schema_dict = JSONSchemaGenerator.schema(NestedFieldSchema)
+```
 """
-function schema(schema_type::Type; use_references::Bool=false, dict_type::Type{<:AbstractDict} = OrderedDict)
+function schema(
+    schema_type::Type;
+    use_references::Bool = false,
+    dict_type::Type{<:AbstractDict} = OrderedDict
+)::AbstractDict{String, Any}
     if use_references
         reference_types = _gather_data_types(schema_type)
     else
@@ -99,10 +130,16 @@ function _generate_json_type_def(::Val{:object}, julia_type::Type, settings::Sch
     return _generate_json_object(julia_type, settings)
 end
 
-function _generate_json_type_def(::Val{:array}, julia_type::Type{<:AbstractArray{T}}, settings::SchemaSettings) where T
+function _generate_json_type_def(::Val{:array}, julia_type::Type{<:AbstractArray}, settings::SchemaSettings)
+    element_type = eltype(julia_type)
+    if settings.use_references && element_type in settings.reference_types
+        item_type = _json_reference(element_type, settings)
+    else
+        item_type = _generate_json_type_def(element_type, settings)
+    end
     return settings.dict_type{String, Any}(
         "type" => "array",
-        "items" => _generate_json_type_def(T, settings)
+        "items" => item_type
     )
 end
 
