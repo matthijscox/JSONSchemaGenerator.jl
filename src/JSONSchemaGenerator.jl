@@ -15,6 +15,7 @@ _json_type(::Type{Nothing}) = :null
 _json_type(::Type{Missing}) = :null
 _json_type(::Type{<:Enum}) = :enum
 _json_type(::Type{<:AbstractString}) = :string
+_json_type(::Type{Symbol}) = :string
 
 _is_nothing_union(::Type) = false
 _is_nothing_union(::Type{Nothing}) = false

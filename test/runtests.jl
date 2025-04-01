@@ -12,6 +12,7 @@ module TestTypes
         int::Int64
         float::Float64
         string::String
+        symbol::Symbol
     end
     StructTypes.StructType(::Type{BasicSchema}) = StructTypes.Struct()
 
@@ -92,15 +93,16 @@ end
 @testset "Basic Types" begin
     json_schema = JSONSchemaGenerator.schema(TestTypes.BasicSchema)
     @test json_schema["type"] == "object"
-    object_properties = ["int", "float", "string"]
+    object_properties = ["int", "float", "string", "symbol"]
     @test all(x in object_properties for x in json_schema["required"])
     @test all(x in object_properties for x in keys(json_schema["properties"]))
 
     @test json_schema["properties"]["int"]["type"] == "integer"
     @test json_schema["properties"]["float"]["type"] == "number"
     @test json_schema["properties"]["string"]["type"] == "string"
+    @test json_schema["properties"]["symbol"]["type"] == "string"
 
-    test_json_schema_validation(TestTypes.BasicSchema(1, 1.0, "a"))
+    test_json_schema_validation(TestTypes.BasicSchema(1, 1.0, "a", :b))
 end
 
 @testset "Enumerators" begin
