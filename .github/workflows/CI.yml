@@ -29,11 +29,11 @@ jobs:
           - macOS-latest
           - windows-latest
         exclude:
-          - github-runner: macos-latest # Apple Silicon
-            julia-version: 'min'
+          - os: macos-latest # Apple Silicon
+            version: 'min'
         include:
-          - github-runner: macos-13 # Intel
-            julia-version: 'min'
+          - os: macos-13 # Intel
+            version: 'min'
 
     steps:
       - uses: actions/checkout@v4
