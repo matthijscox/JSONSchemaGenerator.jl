@@ -4,6 +4,10 @@ import Dates
 import OrderedCollections: OrderedDict
 import StructTypes
 
+if !isdefined(Base, :fieldtypes) && VERSION < v"1.1"
+    fieldtypes(T::Type) = (Any[fieldtype(T, i) for i in 1:fieldcount(T)]...,)
+end
+
 # by default we assume the type is a custom type, which should be a JSON object
 _json_type(::Type{<:Any}) = :object
 #_json_type(::Type{<:AbstractDict}) = :object
