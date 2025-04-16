@@ -1,7 +1,12 @@
 module JSONSchemaGenerator
 
+import Dates
 import OrderedCollections: OrderedDict
 import StructTypes
+
+if !isdefined(Base, :fieldtypes) && VERSION < v"1.1"
+    fieldtypes(T::Type) = (Any[fieldtype(T, i) for i in 1:fieldcount(T)]...,)
+end
 
 # by default we assume the type is a custom type, which should be a JSON object
 _json_type(::Type{<:Any}) = :object
@@ -15,6 +20,12 @@ _json_type(::Type{Nothing}) = :null
 _json_type(::Type{Missing}) = :null
 _json_type(::Type{<:Enum}) = :enum
 _json_type(::Type{<:AbstractString}) = :string
+_json_type(::Type{Symbol}) = :string
+_json_type(::Type{<:AbstractChar}) = :string
+_json_type(::Type{Base.UUID}) = :string
+_json_type(::Type{T}) where {T <: Dates.TimeType} = :string
+_json_type(::Type{VersionNumber}) = :string
+_json_type(::Type{Base.Regex}) = :string
 
 _is_nothing_union(::Type) = false
 _is_nothing_union(::Type{Nothing}) = false

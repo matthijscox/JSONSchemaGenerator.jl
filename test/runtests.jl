@@ -1,17 +1,25 @@
 using JSONSchemaGenerator
 using Test
+using Dates
 using JSON
 using JSON3
 using JSONSchema
 using StructTypes
 
 module TestTypes
+    using Dates
     using StructTypes
 
     struct BasicSchema
         int::Int64
         float::Float64
         string::String
+        symbol::Symbol
+        char::Char
+        uuid::Base.UUID
+        timetype::Dates.DateTime
+        version_number::VersionNumber
+        regex::Regex
     end
     StructTypes.StructType(::Type{BasicSchema}) = StructTypes.Struct()
 
@@ -92,15 +100,21 @@ end
 @testset "Basic Types" begin
     json_schema = JSONSchemaGenerator.schema(TestTypes.BasicSchema)
     @test json_schema["type"] == "object"
-    object_properties = ["int", "float", "string"]
+    object_properties = ["int", "float", "string", "symbol", "char", "uuid", "timetype", "version_number", "regex"]
     @test all(x in object_properties for x in json_schema["required"])
     @test all(x in object_properties for x in keys(json_schema["properties"]))
 
     @test json_schema["properties"]["int"]["type"] == "integer"
     @test json_schema["properties"]["float"]["type"] == "number"
     @test json_schema["properties"]["string"]["type"] == "string"
+    @test json_schema["properties"]["symbol"]["type"] == "string"
+    @test json_schema["properties"]["char"]["type"] == "string"
+    @test json_schema["properties"]["uuid"]["type"] == "string"
+    @test json_schema["properties"]["timetype"]["type"] == "string"
+    @test json_schema["properties"]["version_number"]["type"] == "string"
+    @test json_schema["properties"]["regex"]["type"] == "string"
 
-    test_json_schema_validation(TestTypes.BasicSchema(1, 1.0, "a"))
+    test_json_schema_validation(TestTypes.BasicSchema(1, 1.0, "a", :b, 'c', Base.UUID(0), Dates.now(), v"0.0.1", r""))
 end
 
 @testset "Enumerators" begin
