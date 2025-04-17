@@ -1,7 +1,7 @@
 name = "JSONSchemaGenerator"
 uuid = "b10a6b5e-eaef-4b72-b159-8e5005e98e8e"
 authors = ["matthijscox <matthijs.cox@gmail.com> and contributors"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
