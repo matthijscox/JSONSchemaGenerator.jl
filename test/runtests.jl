@@ -9,6 +9,7 @@ using StructTypes
 module TestTypes
     using Dates
     using StructTypes
+    import JSONSchemaGenerator as JSG
 
     struct BasicSchema
         int::Int64
@@ -83,6 +84,27 @@ module TestTypes
             EnumeratedSchema(apple),
             NestedSchema(),
         )
+    end
+
+    struct ConstantInt1Schema
+        int::Val{1}
+    end
+    struct ConstantInt2Schema
+        int::Val{2}
+    end
+    struct ConstantBoolTrueSchema
+        bool::Val{true}
+    end
+    struct BooleanCombinationSchema
+        int::Int
+        bool::Bool
+        allOf::JSG.AllOf{
+            JSG.AnyOf{ConstantInt1Schema, ConstantInt2Schema},
+            JSG.Not{ConstantBoolTrueSchema}
+        }
+    end
+    function BooleanCombinationSchema(int::Int, bool::Bool)
+        return BooleanCombinationSchema(int, bool, JSG.AllOf{JSG.AnyOf{ConstantInt1Schema, ConstantInt2Schema}, JSG.Not{ConstantBoolTrueSchema}}())
     end
 end
 
@@ -268,4 +290,17 @@ end
     # also for single nesting
     json_schema = JSONSchemaGenerator.schema(TestTypes.NestedSchema, use_references=true, dict_type=Dict)
     test_json_schema_validation(json_schema, TestTypes.NestedSchema())
+end
+
+@testset "Boolean Combination of Schemas" begin
+    combo_schema = JSONSchemaGenerator.schema(TestTypes.BooleanCombinationSchema)
+    constantint1_schema = JSONSchemaGenerator.schema(TestTypes.ConstantInt1Schema)
+    constantint2_schema = JSONSchemaGenerator.schema(TestTypes.ConstantInt2Schema)
+    constantbooltrue_schema = JSONSchemaGenerator.schema(TestTypes.ConstantBoolTrueSchema)
+
+    @test combo_schema["allOf"][1]["anyOf"][1] == constantint1_schema
+    @test combo_schema["allOf"][1]["anyOf"][2] == constantint2_schema
+    @test combo_schema["allOf"][2]["not"] == constantbooltrue_schema
+
+    test_json_schema_validation(TestTypes.BooleanCombinationSchema(1, false))
 end

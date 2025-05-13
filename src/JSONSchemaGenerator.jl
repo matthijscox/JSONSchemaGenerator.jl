@@ -8,6 +8,12 @@ if !isdefined(Base, :fieldtypes) && VERSION < v"1.1"
     fieldtypes(T::Type) = (Any[fieldtype(T, i) for i in 1:fieldcount(T)]...,)
 end
 
+# support boolean combinations of schemas by supplying the following types for use in structs
+struct AllOf{T,S} end
+struct AnyOf{T,S} end
+struct OneOf{T,S} end
+struct Not{T} end
+
 # by default we assume the type is a custom type, which should be a JSON object
 _json_type(::Type{<:Any}) = :object
 #_json_type(::Type{<:AbstractDict}) = :object
@@ -26,6 +32,11 @@ _json_type(::Type{Base.UUID}) = :string
 _json_type(::Type{T}) where {T <: Dates.TimeType} = :string
 _json_type(::Type{VersionNumber}) = :string
 _json_type(::Type{Base.Regex}) = :string
+_json_type(::Type{<:Val}) = :const
+_json_type(::Type{<:AllOf}) = :keyword
+_json_type(::Type{<:AnyOf}) = :keyword
+_json_type(::Type{<:OneOf}) = :keyword
+_json_type(::Type{<:Not}) = :keyword
 
 _is_nothing_union(::Type) = false
 _is_nothing_union(::Type{Nothing}) = false
@@ -104,9 +115,29 @@ function _generate_json_object(julia_type::Type, settings::SchemaSettings)
     required_json_property_names = String[]
     json_properties = []
     optional_fields = StructTypes.omitempties(julia_type)
+    allOfDict, anyOfDict, oneOfDict, notDict = nothing, nothing, nothing, nothing
     # TODO: use StructTypes.names instead of fieldnames
     for (name, type) in zip(names, types)
         name_string = string(name)
+        # check for keywords
+        if type <: AllOf
+            @assert (name_string == "allOf") "element of type AllOf in $(nameof(julia_type)) should have the name allOf, currently has name $(name)" # avoid mulitple uses in one object
+            allOfDict = _generate_json_type_def(type, settings)
+            continue # don't add allOf keyword to properties
+        elseif type <: AnyOf
+            @assert (name_string == "anyOf") "element of type AnyOf in $(nameof(julia_type)) should have the name anyOf, currently has name $(name)" # avoid mulitple uses in one object
+            anyOfDict = _generate_json_type_def(type, settings)
+            continue # don't add anyOf keyword to properties
+        elseif type <: OneOf
+            @assert (name_string == "oneOf") "element of type AnyOf in $(nameof(julia_type)) should have the name oneOf, currently has name $(name)" # avoid mulitple uses in one object
+            oneOfDict = _generate_json_type_def(type, settings)
+            continue # don't add oneOf keyword to properties
+        elseif type <: Not
+            @assert (name_string == "not") "element of type AnyOf in $(nameof(julia_type)) should have the name not, currently has name $(name)" # avoid mulitple uses in one object
+            notDict = _generate_json_type_def(type, settings)
+            continue # don't add not keyword to properties
+        end
+        # otherwise assume its a property
         if _is_nothing_union(type) # we assume it's an optional field type
             @assert name in optional_fields "we miss $name in $(StructTypes.omitempties(julia_type))"
             type = _get_optional_type(type)
@@ -129,6 +160,11 @@ function _generate_json_object(julia_type::Type, settings::SchemaSettings)
     )
     if is_top_level && settings.use_references
         d["\$defs"] = _generate_json_reference_types(settings)
+    end
+    for dict in [allOfDict, anyOfDict, oneOfDict, notDict]
+        if !isnothing(dict)
+            merge!(d, dict)
+        end
     end
     return d
 end
@@ -154,9 +190,39 @@ function _generate_json_type_def(::Val{:array}, julia_type::Type{<:AbstractArray
     )
 end
 
+function _generate_json_type_def(::Val{:const}, julia_type::Type{<:Val}, settings::SchemaSettings)
+    return settings.dict_type{String, Any}(
+        "const" => julia_type.parameters[1]
+    )
+end
+
 function _generate_json_type_def(::Val{:enum}, julia_type::Type, settings::SchemaSettings)
     return settings.dict_type{String, Any}(
         "enum" => string.(instances(julia_type))
+    )
+end
+
+function _generate_json_type_def(::Val{:keyword}, julia_type::Type{AllOf{T,S}}, settings::SchemaSettings) where {T,S}
+    return settings.dict_type{String, Any}(
+        "allOf" => [_generate_json_type_def(T, settings), _generate_json_type_def(S, settings)]
+    )
+end
+
+function _generate_json_type_def(::Val{:keyword}, julia_type::Type{AnyOf{T,S}}, settings::SchemaSettings) where {T,S}
+    return settings.dict_type{String, Any}(
+        "anyOf" => [_generate_json_type_def(T, settings), _generate_json_type_def(S, settings)]
+    )
+end
+
+function _generate_json_type_def(::Val{:keyword}, julia_type::Type{OneOf{T,S}}, settings::SchemaSettings) where {T,S}
+    return settings.dict_type{String, Any}(
+        "oneOf" => [_generate_json_type_def(T, settings), _generate_json_type_def(S, settings)]
+    )
+end
+
+function _generate_json_type_def(::Val{:keyword}, julia_type::Type{Not{T}}, settings::SchemaSettings) where {T}
+    return settings.dict_type{String, Any}(
+        "not" => _generate_json_type_def(T, settings)
     )
 end
 
