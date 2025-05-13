@@ -156,6 +156,8 @@ JSONSchema.validate(JSONSchema.Schema(schema_dict), json_dict) === nothing
 
 JSONSchemaGenerator.jl provides special types `AllOf{T,S}`, `AnyOf{T,S}`, `OneOf{T,S}` and `Not{T}`, allowing generation of the corresponding JSON keyword (see [Boolean JSON Schema combination](https://json-schema.org/understanding-json-schema/reference/combining)). Note that more than two schemas can be combined by chaining: e.g. `AllOf{A, AllOf{B, C}}`.
 
+Fields of these types should be included in `StructTypes.excludes`.
+
 In the following example we combine some schemas that check if fields are equal to certain const values (using `Val` types):
 ```julia
 import JSONSchemaGenerator as JSG

@@ -115,27 +115,25 @@ function _generate_json_object(julia_type::Type, settings::SchemaSettings)
     required_json_property_names = String[]
     json_properties = []
     optional_fields = StructTypes.omitempties(julia_type)
-    allOfDict, anyOfDict, oneOfDict, notDict = nothing, nothing, nothing, nothing
+    keyword_dicts = Dict()
+    keywords = ["allOf", "anyOf", "oneOf", "not"]
+    keyword_types = [AllOf, AnyOf, OneOf, Not]
+    keyword_fields = StructTypes.excludes(julia_type)
     # TODO: use StructTypes.names instead of fieldnames
     for (name, type) in zip(names, types)
         name_string = string(name)
         # check for keywords
-        if type <: AllOf
-            @assert (name_string == "allOf") "element of type AllOf in $(nameof(julia_type)) should have the name allOf, currently has name $(name_string)" # avoid mulitple uses in one object
-            allOfDict = _generate_json_type_def(type, settings)
-            continue # don't add allOf keyword to properties
-        elseif type <: AnyOf
-            @assert (name_string == "anyOf") "element of type AnyOf in $(nameof(julia_type)) should have the name anyOf, currently has name $(name_string)" # avoid mulitple uses in one object
-            anyOfDict = _generate_json_type_def(type, settings)
-            continue # don't add anyOf keyword to properties
-        elseif type <: OneOf
-            @assert (name_string == "oneOf") "element of type AnyOf in $(nameof(julia_type)) should have the name oneOf, currently has name $(name_string)" # avoid mulitple uses in one object
-            oneOfDict = _generate_json_type_def(type, settings)
-            continue # don't add oneOf keyword to properties
-        elseif type <: Not
-            @assert (name_string == "not") "element of type AnyOf in $(nameof(julia_type)) should have the name not, currently has name $(name_string)" # avoid mulitple uses in one object
-            notDict = _generate_json_type_def(type, settings)
-            continue # don't add not keyword to properties
+        is_keyword = false
+        for (keyword, keyword_type) in zip(keywords, keyword_types)
+            if type <: keyword_type
+                is_keyword = true
+                @assert (name_string == keyword) "element of type $(nameof(keyword_type)) in $(nameof(julia_type)) should have the name $(keyword), currently has name $(name_string)" # avoid mulitple uses in one object
+                @assert (name in keyword_fields) "we miss $(name_string) in StructTypes.excludes($(julia_type))"
+                keyword_dicts[keyword] = _generate_json_type_def(type, settings)
+            end
+        end
+        if is_keyword
+            continue # don't add keyword to properties
         end
         # otherwise assume its a property
         if _is_nothing_union(type) # we assume it's an optional field type
@@ -161,9 +159,9 @@ function _generate_json_object(julia_type::Type, settings::SchemaSettings)
     if is_top_level && settings.use_references
         d["\$defs"] = _generate_json_reference_types(settings)
     end
-    for dict in [allOfDict, anyOfDict, oneOfDict, notDict]
-        if !isnothing(dict)
-            merge!(d, dict)
+    for keyword in keywords
+        if keyword in keys(keyword_dicts)
+            merge!(d, keyword_dicts[keyword])
         end
     end
     return d
