@@ -121,19 +121,19 @@ function _generate_json_object(julia_type::Type, settings::SchemaSettings)
         name_string = string(name)
         # check for keywords
         if type <: AllOf
-            @assert (name_string == "allOf") "element of type AllOf in $(nameof(julia_type)) should have the name allOf, currently has name $(name)" # avoid mulitple uses in one object
+            @assert (name_string == "allOf") "element of type AllOf in $(nameof(julia_type)) should have the name allOf, currently has name $(name_string)" # avoid mulitple uses in one object
             allOfDict = _generate_json_type_def(type, settings)
             continue # don't add allOf keyword to properties
         elseif type <: AnyOf
-            @assert (name_string == "anyOf") "element of type AnyOf in $(nameof(julia_type)) should have the name anyOf, currently has name $(name)" # avoid mulitple uses in one object
+            @assert (name_string == "anyOf") "element of type AnyOf in $(nameof(julia_type)) should have the name anyOf, currently has name $(name_string)" # avoid mulitple uses in one object
             anyOfDict = _generate_json_type_def(type, settings)
             continue # don't add anyOf keyword to properties
         elseif type <: OneOf
-            @assert (name_string == "oneOf") "element of type AnyOf in $(nameof(julia_type)) should have the name oneOf, currently has name $(name)" # avoid mulitple uses in one object
+            @assert (name_string == "oneOf") "element of type AnyOf in $(nameof(julia_type)) should have the name oneOf, currently has name $(name_string)" # avoid mulitple uses in one object
             oneOfDict = _generate_json_type_def(type, settings)
             continue # don't add oneOf keyword to properties
         elseif type <: Not
-            @assert (name_string == "not") "element of type AnyOf in $(nameof(julia_type)) should have the name not, currently has name $(name)" # avoid mulitple uses in one object
+            @assert (name_string == "not") "element of type AnyOf in $(nameof(julia_type)) should have the name not, currently has name $(name_string)" # avoid mulitple uses in one object
             notDict = _generate_json_type_def(type, settings)
             continue # don't add not keyword to properties
         end

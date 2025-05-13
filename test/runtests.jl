@@ -106,6 +106,8 @@ module TestTypes
     function BooleanCombinationSchema(int::Int, bool::Bool)
         return BooleanCombinationSchema(int, bool, JSG.AllOf{JSG.AnyOf{ConstantInt1Schema, ConstantInt2Schema}, JSG.Not{ConstantBoolTrueSchema}}())
     end
+    StructTypes.StructType(::Type{BooleanCombinationSchema}) = StructTypes.Struct()
+    StructTypes.excludes(::Type{BooleanCombinationSchema}) = (:allOf,)
 end
 
 function test_json_schema_validation(obj::T) where T
