@@ -190,11 +190,72 @@ function BooleanCombinationSchema(int::Int, bool::Bool)
     return BooleanCombinationSchema(int, bool, JSG.AllOf{JSG.AnyOf{ConstantInt1Schema, ConstantInt2Schema}, JSG.Not{ConstantBoolTrueSchema}}())
 end
 
-schema = JSONSchema.Schema(JSG.schema(BooleanCombinationSchema))
+schema_dict = JSG.schema(BooleanCombinationSchema)
 
 good_json = JSON3.write(BooleanCombinationSchema(2, false))
 bad_json = JSON3.write(BooleanCombinationSchema(5, true))
 
-JSONSchema.validate(schema, good_json) === nothing
-JSONSchema.validate(schema, bad_json) !== nothing
+JSONSchema.validate(JSONSchema.Schema(schema_dict), good_json) === nothing
+JSONSchema.validate(JSONSchema.Schema(schema_dict), bad_json) !== nothing
+```
+
+The printed schema looks as follows:
+```julia
+julia> JSON.print(schema_dict, 2)
+{
+  "type": "object",
+  "properties": {
+    "int": {
+      "type": "integer"
+    },
+    "bool": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "int",
+    "bool"
+  ],
+  "allOf": [
+    {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "int": {
+              "const": 1
+            }
+          },
+          "required": [
+            "int"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "int": {
+              "const": 2
+            }
+          },
+          "required": [
+            "int"
+          ]
+        }
+      ]
+    },
+    {
+      "not": {
+        "type": "object",
+        "properties": {
+          "bool": {
+            "const": true
+          }
+        },
+        "required": [
+          "bool"
+        ]
+      }
+    }
+  ]
+}
 ```
