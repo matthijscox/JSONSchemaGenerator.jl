@@ -158,7 +158,7 @@ JSONSchemaGenerator.jl provides special types `AllOf{T,S}`, `AnyOf{T,S}`, `OneOf
 
 Fields of these types should be included in `StructTypes.excludes`.
 
-In the following example we combine some schemas that check if fields are equal to certain const values (using `Val` types):
+In the following example we combine some schemas that check if fields are equal to certain const values (using `Val` types, noting that these do not serialize well and should only be used for validation purposes like this):
 ```julia
 import JSONSchemaGenerator as JSG
 using JSONSchema, JSON3

@@ -9,7 +9,8 @@ using StructTypes
 module TestTypes
     using Dates
     using StructTypes
-    import JSONSchemaGenerator as JSG
+    import JSONSchemaGenerator
+    const JSG = JSONSchemaGenerator
 
     struct BasicSchema
         int::Int64
