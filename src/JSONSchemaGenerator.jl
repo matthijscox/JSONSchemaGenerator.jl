@@ -14,6 +14,9 @@ struct AnyOf{T,S} end
 struct OneOf{T,S} end
 struct Not{T} end
 
+# add use of the above keywords to a struct by specifying a list of them to use with combinationkeywords
+combinationkeywords(::Type) = []
+
 # by default we assume the type is a custom type, which should be a JSON object
 _json_type(::Type{<:Any}) = :object
 #_json_type(::Type{<:AbstractDict}) = :object
@@ -115,27 +118,9 @@ function _generate_json_object(julia_type::Type, settings::SchemaSettings)
     required_json_property_names = String[]
     json_properties = []
     optional_fields = StructTypes.omitempties(julia_type)
-    keyword_dicts = Dict()
-    keywords = ["allOf", "anyOf", "oneOf", "not"]
-    keyword_types = [AllOf, AnyOf, OneOf, Not]
-    keyword_fields = StructTypes.excludes(julia_type)
     # TODO: use StructTypes.names instead of fieldnames
     for (name, type) in zip(names, types)
         name_string = string(name)
-        # check for keywords
-        is_keyword = false
-        for (keyword, keyword_type) in zip(keywords, keyword_types)
-            if type <: keyword_type
-                is_keyword = true
-                @assert (name_string == keyword) "element of type $(nameof(keyword_type)) in $(nameof(julia_type)) should have the name $(keyword), currently has name $(name_string)" # avoid mulitple uses in one object
-                @assert (name in keyword_fields) "we miss $(name_string) in StructTypes.excludes($(julia_type))"
-                keyword_dicts[keyword] = _generate_json_type_def(type, settings)
-            end
-        end
-        if is_keyword
-            continue # don't add keyword to properties
-        end
-        # otherwise assume its a property
         if _is_nothing_union(type) # we assume it's an optional field type
             @assert name in optional_fields "we miss $name in $(StructTypes.omitempties(julia_type))"
             type = _get_optional_type(type)
@@ -159,10 +144,11 @@ function _generate_json_object(julia_type::Type, settings::SchemaSettings)
     if is_top_level && settings.use_references
         d["\$defs"] = _generate_json_reference_types(settings)
     end
-    for keyword in keywords
-        if keyword in keys(keyword_dicts)
-            merge!(d, keyword_dicts[keyword])
-        end
+    for combination_type in combinationkeywords(julia_type)
+        _json_type(combination_type) == :keyword ? nothing : error("combinationkeywords($julia_type) should only contain valid keywords")
+        keyword_dict = _generate_json_type_def(combination_type, settings)
+        issubset(keys(keyword_dict), keys(d)) ? error("each keyword should only appear at most once in combinationkeywords($julia_type)") : nothing
+        merge!(d, keyword_dict)
     end
     return d
 end

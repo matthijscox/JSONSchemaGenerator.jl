@@ -154,9 +154,7 @@ JSONSchema.validate(JSONSchema.Schema(schema_dict), json_dict) === nothing
 
 ## Boolean Combination Keywords
 
-JSONSchemaGenerator.jl provides special types `AllOf{T,S}`, `AnyOf{T,S}`, `OneOf{T,S}` and `Not{T}`, allowing generation of the corresponding JSON keyword (see [Boolean JSON Schema combination](https://json-schema.org/understanding-json-schema/reference/combining)). Note that more than two schemas can be combined by chaining: e.g. `AllOf{A, AllOf{B, C}}`.
-
-Fields of these types should be included in `StructTypes.excludes`.
+JSONSchemaGenerator.jl provides a function `combinationkeywords(::Type)` which can be used to associate a struct with an array of special types `AllOf{T,S}`, `AnyOf{T,S}`, `OneOf{T,S}` and `Not{T}` that allow the corresponding JSON keyword to be generated in a schema (see [Boolean JSON Schema combination](https://json-schema.org/understanding-json-schema/reference/combining)). Note that more than two schemas can be combined by chaining: e.g. `AllOf{A, AllOf{B, C}}`.
 
 In the following example we combine some schemas that check if fields are equal to certain const values (using `Val` types, noting that these do not serialize well and should only be used for validation purposes like this):
 ```julia
@@ -178,17 +176,14 @@ end
 struct BooleanCombinationSchema
     int::Int
     bool::Bool
-    allOf::JSG.AllOf{
+end
+StructTypes.StructType(::Type{BooleanCombinationSchema}) = StructTypes.Struct()
+JSG.combinationkeywords(::Type{BooleanCombinationSchema}) = [
+    JSG.AllOf{
         JSG.AnyOf{ConstantInt1Schema, ConstantInt2Schema},
         JSG.Not{ConstantBoolTrueSchema}
     }
-end
-StructTypes.StructType(::Type{BooleanCombinationSchema}) = StructTypes.Struct()
-StructTypes.excludes(::Type{BooleanCombinationSchema}) = (:allOf,) # we don't actually want to see this element if (de)serializing with JSON3
-
-function BooleanCombinationSchema(int::Int, bool::Bool)
-    return BooleanCombinationSchema(int, bool, JSG.AllOf{JSG.AnyOf{ConstantInt1Schema, ConstantInt2Schema}, JSG.Not{ConstantBoolTrueSchema}}())
-end
+]
 
 schema_dict = JSG.schema(BooleanCombinationSchema)
 
