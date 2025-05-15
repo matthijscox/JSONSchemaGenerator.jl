@@ -156,7 +156,7 @@ JSONSchema.validate(JSONSchema.Schema(schema_dict), json_dict) === nothing
 
 JSONSchemaGenerator.jl provides a function `combinationkeywords(::Type)` which can be used to associate a struct with an array of special types `AllOf{T,S}`, `AnyOf{T,S}`, `OneOf{T,S}` and `Not{T}` that allow the corresponding JSON keyword to be generated in a schema (see [Boolean JSON Schema combination](https://json-schema.org/understanding-json-schema/reference/combining)). Note that more than two schemas can be combined by chaining: e.g. `AllOf{A, AllOf{B, C}}`.
 
-In the following example we combine some schemas that check if fields are equal to certain const values (using `Val` types, noting that these do not serialize well and should only be used for validation purposes like this):
+In the following example we combine some schemas that check if fields are equal to specific values (using `Val` and `Tuple` types, noting that these do not serialize well and should only be used for validation purposes like this):
 ```julia
 import JSONSchemaGenerator as JSG
 using JSONSchema, JSON3
@@ -165,8 +165,8 @@ struct ConstantInt1Schema
     int::Val{1}
 end
 
-struct ConstantInt2Schema
-    int::Val{2}
+struct EnumInt2Or3Schema
+    int::Tuple{2,3}
 end
 
 struct ConstantBoolTrueSchema
@@ -180,7 +180,7 @@ end
 StructTypes.StructType(::Type{BooleanCombinationSchema}) = StructTypes.Struct()
 JSG.combinationkeywords(::Type{BooleanCombinationSchema}) = [
     JSG.AllOf{
-        JSG.AnyOf{ConstantInt1Schema, ConstantInt2Schema},
+        JSG.AnyOf{ConstantInt1Schema, EnumInt2Or3Schema},
         JSG.Not{ConstantBoolTrueSchema}
     }
 ]
@@ -197,6 +197,7 @@ JSONSchema.validate(JSONSchema.Schema(schema_dict), bad_json) !== nothing
 The printed schema looks as follows:
 ```julia
 julia> JSON.print(schema_dict, 2)
+JSON.print(schema_dict, 2)
 {
   "type": "object",
   "properties": {
@@ -229,7 +230,10 @@ julia> JSON.print(schema_dict, 2)
           "type": "object",
           "properties": {
             "int": {
-              "const": 2
+              "enum": [
+                2,
+                3
+              ]
             }
           },
           "required": [

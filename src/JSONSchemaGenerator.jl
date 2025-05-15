@@ -29,6 +29,7 @@ _json_type(::Type{T}) where {T <: Dates.TimeType} = :string
 _json_type(::Type{VersionNumber}) = :string
 _json_type(::Type{Base.Regex}) = :string
 _json_type(::Type{<:Val}) = :const
+_json_type(::Type{<:Tuple}) = :enum
 _json_type(::Type{<:AllOf}) = :keyword
 _json_type(::Type{<:AnyOf}) = :keyword
 _json_type(::Type{<:OneOf}) = :keyword
@@ -170,6 +171,12 @@ end
 function _generate_json_type_def(::Val{:const}, julia_type::Type{<:Val}, settings::SchemaSettings)
     return settings.dict_type{String, Any}(
         "const" => julia_type.parameters[1]
+    )
+end
+
+function _generate_json_type_def(::Val{:enum}, julia_type::Type{<:Tuple}, settings::SchemaSettings)
+    return settings.dict_type{String, Any}(
+        "enum" => [p isa Symbol ? String(p) : p for p in julia_type.parameters]
     )
 end
 
