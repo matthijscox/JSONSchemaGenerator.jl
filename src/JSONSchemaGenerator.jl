@@ -8,14 +8,7 @@ if !isdefined(Base, :fieldtypes) && VERSION < v"1.1"
     fieldtypes(T::Type) = (Any[fieldtype(T, i) for i in 1:fieldcount(T)]...,)
 end
 
-# support boolean combinations of schemas by supplying the following types for use in structs
-struct AllOf{T,S} end
-struct AnyOf{T,S} end
-struct OneOf{T,S} end
-struct Not{T} end
-
-# add use of the above keywords to a struct by specifying a list of them to use with combinationkeywords
-combinationkeywords(::Type) = []
+include("CombinationKeywordTypes.jl")
 
 # by default we assume the type is a custom type, which should be a JSON object
 _json_type(::Type{<:Any}) = :object
