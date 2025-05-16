@@ -8,6 +8,8 @@ if !isdefined(Base, :fieldtypes) && VERSION < v"1.1"
     fieldtypes(T::Type) = (Any[fieldtype(T, i) for i in 1:fieldcount(T)]...,)
 end
 
+include("CombinationKeywordTypes.jl")
+
 # by default we assume the type is a custom type, which should be a JSON object
 _json_type(::Type{<:Any}) = :object
 #_json_type(::Type{<:AbstractDict}) = :object
@@ -26,6 +28,12 @@ _json_type(::Type{Base.UUID}) = :string
 _json_type(::Type{T}) where {T <: Dates.TimeType} = :string
 _json_type(::Type{VersionNumber}) = :string
 _json_type(::Type{Base.Regex}) = :string
+_json_type(::Type{<:Val}) = :const
+_json_type(::Type{<:Tuple}) = :enum
+_json_type(::Type{<:AllOf}) = :keyword
+_json_type(::Type{<:AnyOf}) = :keyword
+_json_type(::Type{<:OneOf}) = :keyword
+_json_type(::Type{<:Not}) = :keyword
 
 _is_nothing_union(::Type) = false
 _is_nothing_union(::Type{Nothing}) = false
@@ -130,6 +138,12 @@ function _generate_json_object(julia_type::Type, settings::SchemaSettings)
     if is_top_level && settings.use_references
         d["\$defs"] = _generate_json_reference_types(settings)
     end
+    for combination_type in combinationkeywords(julia_type)
+        _json_type(combination_type) == :keyword ? nothing : error("combinationkeywords($julia_type) should only contain valid keywords")
+        keyword_dict = _generate_json_type_def(combination_type, settings)
+        issubset(keys(keyword_dict), keys(d)) ? error("each keyword should only appear at most once in combinationkeywords($julia_type)") : nothing
+        merge!(d, keyword_dict)
+    end
     return d
 end
 
@@ -154,9 +168,45 @@ function _generate_json_type_def(::Val{:array}, julia_type::Type{<:AbstractArray
     )
 end
 
+function _generate_json_type_def(::Val{:const}, julia_type::Type{<:Val}, settings::SchemaSettings)
+    return settings.dict_type{String, Any}(
+        "const" => julia_type.parameters[1]
+    )
+end
+
+function _generate_json_type_def(::Val{:enum}, julia_type::Type{<:Tuple}, settings::SchemaSettings)
+    return settings.dict_type{String, Any}(
+        "enum" => [p isa Symbol ? String(p) : p for p in julia_type.parameters]
+    )
+end
+
 function _generate_json_type_def(::Val{:enum}, julia_type::Type, settings::SchemaSettings)
     return settings.dict_type{String, Any}(
         "enum" => string.(instances(julia_type))
+    )
+end
+
+function _generate_json_type_def(::Val{:keyword}, julia_type::Type{AllOf{T,S}}, settings::SchemaSettings) where {T,S}
+    return settings.dict_type{String, Any}(
+        "allOf" => [_generate_json_type_def(T, settings), _generate_json_type_def(S, settings)]
+    )
+end
+
+function _generate_json_type_def(::Val{:keyword}, julia_type::Type{AnyOf{T,S}}, settings::SchemaSettings) where {T,S}
+    return settings.dict_type{String, Any}(
+        "anyOf" => [_generate_json_type_def(T, settings), _generate_json_type_def(S, settings)]
+    )
+end
+
+function _generate_json_type_def(::Val{:keyword}, julia_type::Type{OneOf{T,S}}, settings::SchemaSettings) where {T,S}
+    return settings.dict_type{String, Any}(
+        "oneOf" => [_generate_json_type_def(T, settings), _generate_json_type_def(S, settings)]
+    )
+end
+
+function _generate_json_type_def(::Val{:keyword}, julia_type::Type{Not{T}}, settings::SchemaSettings) where {T}
+    return settings.dict_type{String, Any}(
+        "not" => _generate_json_type_def(T, settings)
     )
 end
 

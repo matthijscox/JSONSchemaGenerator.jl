@@ -9,6 +9,8 @@ using StructTypes
 module TestTypes
     using Dates
     using StructTypes
+    import JSONSchemaGenerator
+    const JSG = JSONSchemaGenerator
 
     struct BasicSchema
         int::Int64
@@ -84,6 +86,42 @@ module TestTypes
             NestedSchema(),
         )
     end
+
+    struct ConstantInt1Schema
+        int::Val{1}
+    end
+    struct EnumInt2Or3Schema
+        int::Tuple{2,3}
+    end
+    struct ConstantBoolTrueSchema
+        bool::Val{true}
+    end
+    struct BooleanCombinationSchema
+        int::Int
+        bool::Bool
+    end
+    JSG.combinationkeywords(::Type{BooleanCombinationSchema}) = [
+        JSG.AllOf{
+            JSG.AnyOf{ConstantInt1Schema, EnumInt2Or3Schema},
+            JSG.Not{ConstantBoolTrueSchema}
+        }
+    ]
+    StructTypes.StructType(::Type{BooleanCombinationSchema}) = StructTypes.Struct()
+
+    struct BadBooleanCombinationSchema
+        int::Int
+    end
+    StructTypes.StructType(::Type{BadBooleanCombinationSchema}) = StructTypes.Struct()
+    JSG.combinationkeywords(::Type{BadBooleanCombinationSchema}) = [
+        JSG.AllOf{ConstantInt1Schema, ConstantInt1Schema},
+        JSG.AllOf{EnumInt2Or3Schema, EnumInt2Or3Schema}
+    ]
+
+    struct BadBooleanCombinationSchema2
+        int::Int
+    end
+    StructTypes.StructType(::Type{BadBooleanCombinationSchema2}) = StructTypes.Struct()
+    JSG.combinationkeywords(::Type{BadBooleanCombinationSchema2}) = [Int32]
 end
 
 function test_json_schema_validation(obj::T) where T
@@ -268,4 +306,29 @@ end
     # also for single nesting
     json_schema = JSONSchemaGenerator.schema(TestTypes.NestedSchema, use_references=true, dict_type=Dict)
     test_json_schema_validation(json_schema, TestTypes.NestedSchema())
+end
+
+@testset "Boolean Combination of Schemas" begin
+    @testset "Good weather" begin
+        combo_schema = JSONSchemaGenerator.schema(TestTypes.BooleanCombinationSchema)
+        constantint1_schema = JSONSchemaGenerator.schema(TestTypes.ConstantInt1Schema)
+        enumint2or3_schema = JSONSchemaGenerator.schema(TestTypes.EnumInt2Or3Schema)
+        constantbooltrue_schema = JSONSchemaGenerator.schema(TestTypes.ConstantBoolTrueSchema)
+
+        @test combo_schema["allOf"][1]["anyOf"][1] == constantint1_schema
+        @test combo_schema["allOf"][1]["anyOf"][2] == enumint2or3_schema
+        @test combo_schema["allOf"][2]["not"] == constantbooltrue_schema
+
+        test_json_schema_validation(TestTypes.BooleanCombinationSchema(1, false))
+        test_json_schema_validation(TestTypes.BooleanCombinationSchema(2, false))
+        test_json_schema_validation(TestTypes.BooleanCombinationSchema(3, false))
+    end
+
+    @testset "Multiple uses of same keyword in one object" begin
+        @test_throws Exception bad_combo_schema = JSONSchemaGenerator.schema(TestTypes.BadBooleanCombinationSchema)
+    end
+
+    @testset "Use of incorrect type in combinationkeywords" begin
+        @test_throws Exception bad_combo_schema2 = JSONSchemaGenerator.schema(TestTypes.BadBooleanCombinationSchema2)
+    end
 end
